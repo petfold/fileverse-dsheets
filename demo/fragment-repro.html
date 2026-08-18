@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>bzz:// fragment delivery test</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 44rem; padding: 0 1rem; }
+    #verdict.ok { color: #0a7f2e; }
+    #verdict.bad { color: #c62828; }
+    pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; font-size: 13px; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #111; color: #ddd; }
+      pre { background: #222; }
+    }
+  </style>
+</head>
+<body>
+  <h1 id="verdict"></h1>
+  <p>
+    Open this page as <code>bzz://&lt;reference&gt;/?q=1#test=hello</code>.
+    The page reports exactly the URL its JavaScript received. The fragment is
+    never sent to any server, so whatever the address bar shows, the page
+    must see the same <code>#test=hello</code> — every load, every retry.
+  </p>
+  <p>
+    <strong>Repro for the suspected bug:</strong> quit the browser, reopen
+    it, and paste the full URL immediately, so the embedded node is cold and
+    the browser shows its "Content not ready yet" page first. Press its
+    <em>Try Again</em>. When this page finally loads, compare the verdict
+    with the address bar. The log below survives the bounce
+    (sessionStorage), so earlier loads of this visit stay visible.
+  </p>
+  <p>
+    <a href="#test=second">in-page link to #test=second</a> ·
+    <button onclick="location.reload()">reload</button> ·
+    <button onclick="sessionStorage.removeItem('fragment-log'); location.reload()">clear log</button>
+  </p>
+  <pre id="report"></pre>
+  <script>
+    (function () {
+      var nav = performance.getEntriesByType
+        ? performance.getEntriesByType('navigation')[0]
+        : null;
+      var entry = {
+        time: new Date().toISOString(),
+        href: location.href,
+        query: location.search || '(empty)',
+        hash: location.hash || '(EMPTY)',
+        navigationType: nav ? nav.type : 'unknown',
+        referrer: document.referrer || '(none)'
+      };
+      var log;
+      try { log = JSON.parse(sessionStorage.getItem('fragment-log') || '[]'); }
+      catch (e) { log = []; }
+      log.push(entry);
+      try { sessionStorage.setItem('fragment-log', JSON.stringify(log)); }
+      catch (e) { /* still shown below */ }
+
+      var verdict = document.getElementById('verdict');
+      if (location.hash) {
+        verdict.textContent = 'FRAGMENT RECEIVED: ' + location.hash;
+        verdict.className = 'ok';
+      } else {
+        verdict.textContent = 'NO FRAGMENT RECEIVED';
+        verdict.className = 'bad';
+      }
+      var render = function () {
+        document.getElementById('report').textContent =
+          JSON.stringify(log, null, 2);
+      };
+      render();
+      console.log('[fragment-repro]', entry);
+
+      window.addEventListener('hashchange', function () {
+        log.push({
+          time: new Date().toISOString(),
+          event: 'hashchange',
+          hash: location.hash || '(EMPTY)'
+        });
+        try { sessionStorage.setItem('fragment-log', JSON.stringify(log)); }
+        catch (e) { /* ignore */ }
+        render();
+      });
+    })();
+  </script>
+</body>
+</html>
