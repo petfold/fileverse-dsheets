@@ -56,6 +56,40 @@ is localhost-relative to each viewer.
 Local dev server alternative (from `demo/`, with `VITE_BEE_API_URL` in
 `demo/.env`): `npm run dev` → http://localhost:5000/
 
+## Sample sheet (start here)
+
+A written-up sheet — explaining what is stored where and what happens when
+you edit it — AES-256-GCM encrypted on Swarm, published 2026-08-18. The
+dsheets counterpart of ddoc's `sample-mswwageg`:
+
+```
+http://localhost:1633/bzz/64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237/?sheet=dsheet-sample-swarm#skey=0xf31588db3bdea51731755f73f06d5c9f20538d2e86a164c60fb4bb32fc2ca15a:%2B5P%2BQ%2Bti%2BvR%2B1SFY5j6jxt9zcgQfLar4Faaj4fPSA7M%3D
+```
+
+For a Swarm-aware browser (Freedom), the same sheet as a `bzz://` URL:
+
+```
+bzz://64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237/?sheet=dsheet-sample-swarm#skey=0xf31588db3bdea51731755f73f06d5c9f20538d2e86a164c60fb4bb32fc2ca15a:%2B5P%2BQ%2Bti%2BvR%2B1SFY5j6jxt9zcgQfLar4Faaj4fPSA7M%3D
+```
+
+**The link carries write access** over the node API — the fragment holds the
+feed signing key and the decryption key — so anyone you send it to can edit
+the sample; their edits become version 1, 2, … while version 0 stays exactly
+as published. In a provider browser it opens read-only (the browser signs
+only as itself).
+
+| Part | Reference |
+| --- | --- |
+| Sheet snapshot (v0) | `c8ccc39d3500b1a2523080e5d61da15a8d8a350bb6bbb8e2340bf276949438a6` |
+| Sheet id / feed topic | `dsheet-sample-swarm` → `dsheet/v1/dsheet-sample-swarm` |
+| Feed owner | `0xf31588db…`'s address (key in the fragment) |
+
+Authored headlessly with the editor's own Y.Doc schema (`plainSheetToYMap`
+field set, fortune-sheet celldata), round-tripped through the package's
+`ySheetArrayToPlain` before publishing, then read back decrypted from the
+feed. Not yet opened in a real browser — that render check is part of the
+next field test.
+
 ## URL shapes to try
 
 A complete sheet URL looks like this (same anatomy as ddoc's sample link —
@@ -67,9 +101,9 @@ http://localhost:1633/bzz/64c0d7cb…9237/?sheet=<sheet-id>#skey=<owner-key>:<do
 
 You never type those parts: the app generates the sheet id and both keys on
 first open and writes them into the address bar itself (ddoc's `resolveKeys`
-mechanism, ported unchanged). They are only in the *plain* links above
-because no sheet has been published as a sample yet — opening a plain link
-mints (or reopens) a sheet and fills the rest in. The address bar is
+mechanism, ported unchanged). The sample link above is the
+populated form; a *plain* app link mints (or reopens) a sheet and fills the
+rest in itself. The address bar is
 therefore always the complete link to the sheet you are looking at; the
 Share button copies it. In a provider browser the fragment is `#dkey=<doc-key>`
 instead: the feed belongs to the browser's own identity, so no owner key
@@ -91,10 +125,6 @@ still means one feed key; whoever holds it is "the writer"). In a provider
 browser a link from elsewhere is read-only: the browser signs only as
 itself and cannot advance someone else's feed.
 
-No sample sheet is published yet — a valid sheet snapshot needs the real
-editor to author it, so the first browser-verified session should save one
-and record its link here, the way the ddoc file carries `sample-mswwageg`.
-
 ## What this postage batch has paid for (dsheets' share)
 
 Batch `c931c8a5ee8def22…` is shared with the ddoc demo (its ledger lives in
@@ -105,6 +135,7 @@ fileverse-ddoc's SWARM-DEMO-LINK.md). dsheets additions:
 | Demo site, last-sheet-reopen build (2026-08-18) | `64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237` |
 | Demo site, boot-retry build (2026-08-18) | `382e9f553956d67d74b39c02f50fa1123393813615c1d7f8dad0171b46b24bda` — superseded: opening the bare app URL minted a fresh blank sheet, read as data loss |
 | Demo site, first upload (2026-08-18) | `95f42ca58ec6bba4641c9248b7fccc7f84a21f34bd1e0d45db73a70bcceb8ad3` — superseded: white screen on a cold Freedom load (no boot retry), provider restore errored instead of deferring, restore panel rendered beside a live editor |
+| Sample sheet v0 (2026-08-18) | `c8ccc39d3500b1a2523080e5d61da15a8d8a350bb6bbb8e2340bf276949438a6` + its feed chunk |
 | Test uploads from the live suites (2026-08-18) | random payloads + e2e sheet feeds, not referenced anywhere |
 
 Site upload is ~15 MB (single app chunk — the vendor/app chunk split ddoc
