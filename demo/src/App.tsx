@@ -557,6 +557,28 @@ function App() {
       sheetEditorRef;
   });
 
+  // Demo-only field diagnostics: run __swarmDebug() in the console to see
+  // what the page actually resolved — the address bar can show a fragment
+  // the page never received, and a silent restore leaves no other trace.
+  useEffect(() => {
+    (window as unknown as { __swarmDebug?: () => unknown }).__swarmDebug =
+      () => ({
+        hashSeen: window.location.hash.slice(0, 24),
+        sheetId: dsheetId,
+        documentHasOwnKey: swarm.documentHasOwnKey,
+        nodeState: swarm.nodeState,
+        canWrite: swarm.canWrite,
+        managesPostage: swarm.managesPostage,
+        provider: swarm.diagnosticsInput.provider,
+        restoreDeferred,
+        restore: swarmSheet.restore,
+        saveState: swarmSheet.saveState,
+        lastError: swarmSheet.lastError,
+        merged: swarmMergedRef.current,
+        contentSynced,
+      });
+  });
+
   return (
     <Router>
       <Routes>

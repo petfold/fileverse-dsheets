@@ -79,8 +79,17 @@ export const useSwarmSheet = ({
         if (cancelled) return;
         setRestore({ phase: 'loading', attempt });
         try {
+          console.warn(
+            `[swarm] restore attempt ${attempt}/${MAX_RESTORE_ATTEMPTS}`,
+            { documentId, expectContent, transport: docStorage.transport.kind },
+          );
           const snapshot = await docStorage.loadDocument(documentId);
           if (cancelled) return;
+          console.warn('[swarm] restore result', {
+            found: Boolean(snapshot),
+            feedIndex: snapshot?.feedIndex,
+            bytes: snapshot?.bytes.length,
+          });
           if (!snapshot && expectContent) {
             throw new Error(
               'This sheet exists on Swarm (its keys came with the link), ' +
