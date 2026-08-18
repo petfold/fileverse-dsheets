@@ -16,12 +16,16 @@ import { SwarmDocumentStorage } from '../../../src/swarm/swarm-document-storage'
  * regardless, so nothing is lost meanwhile.
  */
 
-// A Bee node that has just started answers HTTP before it can serve
+// A node that has just started answers requests before it can serve
 // anything — and a Swarm-aware browser typically opens the page in exactly
-// that window. Retry with a widening gap (matches the ddoc demo).
-export const MAX_RESTORE_ATTEMPTS = 5;
+// that window. Field-measured (Freedom, 2026-08-18): its embedded ant node
+// refused a SOC lookup ~10s after start and served the same chunk fine
+// once warm — the warm-up is tens of seconds, so the budget must span
+// minutes, not seconds.
+export const MAX_RESTORE_ATTEMPTS = 8;
 const restoreRetryDelayMs = (attempt: number) =>
-  [2_000, 4_000, 8_000, 12_000][attempt - 1] ?? 16_000;
+  [2_000, 4_000, 8_000, 12_000, 16_000, 24_000, 30_000][attempt - 1] ??
+  30_000;
 const SAVE_DEBOUNCE_MS = 2_000;
 
 export type SwarmRestoreState =

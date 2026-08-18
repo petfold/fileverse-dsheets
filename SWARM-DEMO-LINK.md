@@ -1,6 +1,6 @@
 # dSheets × Swarm — demo links
 
-**Latest demo: `615fa2c9…`** — the expect-content build, 2026-08-18, from `feat/swarm-storage` (PR 2, stacked on PR 1
+**Latest demo: `f961d2d3…`** — the patient-restore build, 2026-08-18, from `feat/swarm-storage` (PR 2, stacked on PR 1
 `feat/storage-agnostic-collab-services`): pure-Swarm serverless persistence
 — sheet snapshots AES-256-GCM encrypted on Swarm, a feed per sheet as the
 mutable "latest" pointer, feed history as version history. Carries the three
@@ -16,16 +16,22 @@ deferred, had never left the writer's node, which is also the only node
 Brave was reading. And from the fourth test: a sheet whose keys came in the
 link now treats "feed not found" as a retrieval failure — retried with the
 restore screen and an explanation — instead of silently rendering a blank
-grid. Freedom's second blank open happened with both chunks provably
-network-retrievable: its just-started ultra-light node simply could not
-reach them yet, and the app hid that.
+grid. Freedom's blank opens are now fully explained: its console showed the
+fragment delivered, the restore running, and its embedded ant node
+answering "Single Owner Chunk not found" ~10 seconds after starting — the
+same node served every chunk directly (`/chunks/…` = 200) once warm. The
+restore budget therefore now spans minutes (8 attempts, gaps widening to
+30s), the debug build's console logging and `__swarmDebug()` stay in, and
+one open question remains for ant: whether a fresh node could fail SOC
+lookups fast-and-final rather than during a window the client must
+outwait.
 
 Verification state: **package path verified against a live Bee 2.8.1 node;
-UI verified in Brave (sample sheet renders); Freedom verified deferring and
-browse-only reporting; sample snapshot AND feed chunk confirmed
-network-retrievable via `/stewardship`. Open in Freedom: the sample
-rendering there — on a warm node, or via the restore screen's retries on a
-cold one.** All 73 Swarm
+UI verified in Brave (sample sheet renders); Freedom's provider read path
+verified down to its node: fragment delivered, reads issued, chunks
+servable warm (confirmed via ant's own API at :22023). Open: the sample
+rendering in Freedom, expected to pass on a warm node or within the new
+minutes-long retry budget on a cold one.** All 73 Swarm
 unit tests pass live (encrypted save/load/version round-trips, wrong-key
 rejection, stamps endpoints); a headless end-to-end drove the demo's exact
 persistence path (two saves onto a feed, a fresh reader restoring from the
@@ -43,18 +49,20 @@ Served entirely from Swarm — app code and, once you edit, sheet snapshots
 and version history all come off the network:
 
 ```
-http://localhost:1633/bzz/615fa2c9e8ca0d2de8429c1e54a7a2ae5b15fc487f88372432bc3bc0d3e2cfa7/
+http://localhost:1633/bzz/f961d2d3cfa5e619b85e07ad20a9cf150a0f807183b6965f2cbe779026083cc0/
 ```
 
 For a Swarm-aware browser (Freedom), the same reference as a `bzz://` URL:
 
 ```
-bzz://615fa2c9e8ca0d2de8429c1e54a7a2ae5b15fc487f88372432bc3bc0d3e2cfa7/
+bzz://f961d2d3cfa5e619b85e07ad20a9cf150a0f807183b6965f2cbe779026083cc0/
 ```
 
 Previous builds — still deployed, still read the same sheet feeds:
 
 ```
+615fa2c9e8ca0d2de8429c1e54a7a2ae5b15fc487f88372432bc3bc0d3e2cfa7   expect-content build; retry budget (~45s) shorter than a cold node's warm-up
+03c532ddf0450c8ae08d78d42f445fff8d56a24450babfd03bd6f25310a5a9d2   debug build (console logging + __swarmDebug), same short budget
 a228d34dfbb6533e961a50d4e3830dbd80d9e400fed7dfabb3605b4746ddef4d   synchronous-saves build; link-opened sheet rendered blank when a cold node missed its feed
 64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237   last-sheet-reopen build; saves stayed on the local node (deferred)
 382e9f553956d67d74b39c02f50fa1123393813615c1d7f8dad0171b46b24bda   boot-retry build; bare URL minted a new blank sheet
@@ -75,13 +83,13 @@ you edit it — AES-256-GCM encrypted on Swarm, published 2026-08-18. The
 dsheets counterpart of ddoc's `sample-mswwageg`:
 
 ```
-http://localhost:1633/bzz/615fa2c9e8ca0d2de8429c1e54a7a2ae5b15fc487f88372432bc3bc0d3e2cfa7/?sheet=dsheet-sample-swarm#skey=0xf31588db3bdea51731755f73f06d5c9f20538d2e86a164c60fb4bb32fc2ca15a:%2B5P%2BQ%2Bti%2BvR%2B1SFY5j6jxt9zcgQfLar4Faaj4fPSA7M%3D
+http://localhost:1633/bzz/f961d2d3cfa5e619b85e07ad20a9cf150a0f807183b6965f2cbe779026083cc0/?sheet=dsheet-sample-swarm#skey=0xf31588db3bdea51731755f73f06d5c9f20538d2e86a164c60fb4bb32fc2ca15a:%2B5P%2BQ%2Bti%2BvR%2B1SFY5j6jxt9zcgQfLar4Faaj4fPSA7M%3D
 ```
 
 For a Swarm-aware browser (Freedom), the same sheet as a `bzz://` URL:
 
 ```
-bzz://615fa2c9e8ca0d2de8429c1e54a7a2ae5b15fc487f88372432bc3bc0d3e2cfa7/?sheet=dsheet-sample-swarm#skey=0xf31588db3bdea51731755f73f06d5c9f20538d2e86a164c60fb4bb32fc2ca15a:%2B5P%2BQ%2Bti%2BvR%2B1SFY5j6jxt9zcgQfLar4Faaj4fPSA7M%3D
+bzz://f961d2d3cfa5e619b85e07ad20a9cf150a0f807183b6965f2cbe779026083cc0/?sheet=dsheet-sample-swarm#skey=0xf31588db3bdea51731755f73f06d5c9f20538d2e86a164c60fb4bb32fc2ca15a:%2B5P%2BQ%2Bti%2BvR%2B1SFY5j6jxt9zcgQfLar4Faaj4fPSA7M%3D
 ```
 
 **The link carries write access** over the node API — the fragment holds the
@@ -109,7 +117,7 @@ A complete sheet URL looks like this (same anatomy as ddoc's sample link —
 `?doc=` there, `?sheet=` here):
 
 ```
-http://localhost:1633/bzz/615fa2c9…cfa7/?sheet=<sheet-id>#skey=<owner-key>:<doc-key>
+http://localhost:1633/bzz/f961d2d3…3cc0/?sheet=<sheet-id>#skey=<owner-key>:<doc-key>
 ```
 
 You never type those parts: the app generates the sheet id and both keys on
@@ -124,8 +132,8 @@ travels in the link.
 
 | URL | What it exercises |
 | --- | --- |
-| `…/bzz/615fa2c9…/` | Last sheet reopens (or a fresh one on first visit) |
-| `…/bzz/615fa2c9…/` in a private window | Fresh sheet: new id in `?sheet=`, new keys in `#skey=` |
+| `…/bzz/f961d2d3…/` | Last sheet reopens (or a fresh one on first visit) |
+| `…/bzz/f961d2d3…/` in a private window | Fresh sheet: new id in `?sheet=`, new keys in `#skey=` |
 | Same URL again (same browser) | Restore: boot overlay, then the sheet back from Swarm merged with IndexedDB |
 | Same URL in a private window | Shared read: restores from the feed with no local state at all |
 | Same URL, Bee node stopped | Diagnostics bar (node down), edits held; restart the node and they flush |
@@ -145,7 +153,8 @@ fileverse-ddoc's SWARM-DEMO-LINK.md). dsheets additions:
 
 | Content | Reference |
 | --- | --- |
-| Demo site, expect-content build (2026-08-18) | `615fa2c9e8ca0d2de8429c1e54a7a2ae5b15fc487f88372432bc3bc0d3e2cfa7` |
+| Demo site, patient-restore build (2026-08-18) | `f961d2d3cfa5e619b85e07ad20a9cf150a0f807183b6965f2cbe779026083cc0` |
+| Demo site, expect-content + debug builds (2026-08-18) | `615fa2c9e8ca0d2de8429c1e54a7a2ae5b15fc487f88372432bc3bc0d3e2cfa7`, `03c532ddf0450c8ae08d78d42f445fff8d56a24450babfd03bd6f25310a5a9d2` — superseded: retry budget ended before a cold ant node could serve chunks it provably had |
 | Demo site, synchronous-saves build (2026-08-18) | `a228d34dfbb6533e961a50d4e3830dbd80d9e400fed7dfabb3605b4746ddef4d` — superseded: "feed not found" on a link-opened sheet rendered a silent blank grid instead of retrying and explaining |
 | Demo site, last-sheet-reopen build (2026-08-18) | `64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237` — superseded: saves (snapshots + feed updates) uploaded deferred, so a viewer on another node — a Swarm-aware browser included — found nothing |
 | Demo site, boot-retry build (2026-08-18) | `382e9f553956d67d74b39c02f50fa1123393813615c1d7f8dad0171b46b24bda` — superseded: opening the bare app URL minted a fresh blank sheet, read as data loss |
