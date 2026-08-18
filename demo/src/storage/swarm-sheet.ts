@@ -16,8 +16,12 @@ import { SwarmDocumentStorage } from '../../../src/swarm/swarm-document-storage'
  * regardless, so nothing is lost meanwhile.
  */
 
-const MAX_RESTORE_ATTEMPTS = 3;
-const RESTORE_RETRY_DELAY_MS = 3_000;
+// A Bee node that has just started answers HTTP before it can serve
+// anything — and a Swarm-aware browser typically opens the page in exactly
+// that window. Retry with a widening gap (matches the ddoc demo).
+export const MAX_RESTORE_ATTEMPTS = 5;
+const restoreRetryDelayMs = (attempt: number) =>
+  [2_000, 4_000, 8_000, 12_000][attempt - 1] ?? 16_000;
 const SAVE_DEBOUNCE_MS = 2_000;
 
 export type SwarmRestoreState =
@@ -79,7 +83,7 @@ export const useSwarmSheet = ({
             setLastError(message);
             return;
           }
-          await new Promise((r) => setTimeout(r, RESTORE_RETRY_DELAY_MS));
+          await new Promise((r) => setTimeout(r, restoreRetryDelayMs(attempt)));
         }
       }
     })();

@@ -22,7 +22,7 @@ import { useMediaQuery } from 'usehooks-ts';
 import { crypto as cryptoUtils } from './crypto';
 import { collabStore } from './storage/collab-store';
 import { swarmEnabled, useSwarmStorage } from './storage/swarm-store';
-import { useSwarmSheet } from './storage/swarm-sheet';
+import { MAX_RESTORE_ATTEMPTS, useSwarmSheet } from './storage/swarm-sheet';
 import { SwarmNotice } from './components/SwarmNotice';
 import { SwarmRestoreProgress } from './components/SwarmRestoreProgress';
 import { primarySwarmCondition } from '../../src/swarm/swarm-diagnostics';
@@ -61,19 +61,32 @@ function App() {
     markDocumentReadOnly();
     setSharedReadOnly(true);
   }, [markDocumentReadOnly]);
+  // A provider reveals this app's feed identity only once the user grants
+  // access, so a sheet created here (no own key in the URL) cannot even be
+  // looked up before consent. Defer the restore — the Swarm notice offers
+  // the grant, and when it arrives the storage flows in and restore runs.
+  // A sheet opened from a link carries its own key and reads freely.
+  const restoreDeferred =
+    swarmEnabled &&
+    swarm.diagnosticsInput.provider?.reason === 'not-connected' &&
+    !swarm.documentHasOwnKey;
   const swarmSheet = useSwarmSheet({
     documentId: dsheetId,
-    docStorage: swarm.docStorage,
+    docStorage: restoreDeferred ? null : swarm.docStorage,
     canWrite: swarm.canWrite,
     onReadOnlySave,
   });
   const { queueSave } = swarmSheet;
+  // Once the user has typed, a (deferred or retried) restore must not put
+  // the loading screen back over their sheet — it merges silently instead.
+  const [hasEdited, setHasEdited] = useState(false);
 
   const handleSheetChange = useCallback(
     (_updateData: unknown, encodedUpdate?: string) => {
       if (encodedUpdate) {
         localStorage.setItem(`dsheet-content-${dsheetId}`, encodedUpdate);
         isSavedRef.current = true;
+        setHasEdited(true);
         if (swarmEnabled) queueSave(encodedUpdate);
       }
     },
@@ -110,6 +123,8 @@ function App() {
   const swarmBooting =
     swarmEnabled &&
     !swarmMergedRef.current &&
+    !hasEdited &&
+    !restoreDeferred &&
     (swarm.nodeState.kind === 'connecting' ||
       swarmSheet.restore.phase === 'loading' ||
       swarmSheet.restore.phase === 'failed');
@@ -535,26 +550,6 @@ function App() {
           element={
             <div>
               <Toaster position="bottom-right" duration={3000} />
-              {swarmBooting && (
-                <SwarmRestoreProgress
-                  nodeState={swarm.nodeState}
-                  progress={swarm.progress}
-                  managesPostage={swarm.managesPostage}
-                  attempt={
-                    swarmSheet.restore.phase === 'loading'
-                      ? swarmSheet.restore.attempt
-                      : undefined
-                  }
-                  maxAttempts={3}
-                  error={
-                    swarmSheet.restore.phase === 'failed'
-                      ? swarmSheet.restore.error
-                      : null
-                  }
-                  onSkip={swarmSheet.skipRestore}
-                  onRetry={swarmSheet.retryRestore}
-                />
-              )}
               {swarmCondition && !swarmBooting && (
                 <SwarmNotice
                   condition={swarmCondition}
@@ -565,6 +560,28 @@ function App() {
                   onGrantAccess={swarm.grantAccess}
                 />
               )}
+              {swarmBooting ? (
+                // Shown INSTEAD of the editor (as in the ddoc demo): editing
+                // a sheet the restore is about to catch up would mislead.
+                <SwarmRestoreProgress
+                  nodeState={swarm.nodeState}
+                  progress={swarm.progress}
+                  managesPostage={swarm.managesPostage}
+                  attempt={
+                    swarmSheet.restore.phase === 'loading'
+                      ? swarmSheet.restore.attempt
+                      : undefined
+                  }
+                  maxAttempts={MAX_RESTORE_ATTEMPTS}
+                  error={
+                    swarmSheet.restore.phase === 'failed'
+                      ? swarmSheet.restore.error
+                      : null
+                  }
+                  onSkip={swarmSheet.skipRestore}
+                  onRetry={swarmSheet.retryRestore}
+                />
+              ) : (
               <DSheetEditor
                 editorStateRef={editorStateRef}
                 onContentSyncStatusChange={onContentSyncStatusChange}
@@ -590,6 +607,7 @@ function App() {
                   ensResolutionUrl: import.meta.env.VITE_ENS_RPC_URL,
                 }}
               />
+              )}
             </div>
           }
         />
