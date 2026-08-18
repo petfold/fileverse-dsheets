@@ -144,13 +144,31 @@ function App() {
       swarmSheet.restore.phase === 'loading' ||
       swarmSheet.restore.phase === 'failed');
 
+  // A sheet whose feed key came in the link can never be published from a
+  // provider browser (it signs only as itself), so publishing obstacles —
+  // the Grant access prompt included — are noise for it: reading needs no
+  // permission. Same suppression ddoc applies.
+  const providerReadOnlySheet = swarm.managesPostage && swarm.documentHasOwnKey;
   const swarmCondition = swarmEnabled
     ? primarySwarmCondition({
         ...swarm.diagnosticsInput,
         lastError: swarmSheet.lastError,
-        documentReadOnly: sharedReadOnly,
+        documentReadOnly: sharedReadOnly || providerReadOnlySheet,
       })
     : null;
+
+  // A restore that exhausted its budget against a cold node retries by
+  // itself when the provider's state changes (it warmed up, or access was
+  // granted) — a visitor should not have to know to press Try again.
+  const providerReason = swarm.diagnosticsInput.provider?.reason;
+  const prevProviderReasonRef = useRef(providerReason);
+  useEffect(() => {
+    const changed = prevProviderReasonRef.current !== providerReason;
+    prevProviderReasonRef.current = providerReason;
+    if (changed && swarmSheet.restore.phase === 'failed') {
+      swarmSheet.retryRestore();
+    }
+  }, [providerReason, swarmSheet.restore.phase, swarmSheet.retryRestore]);
 
   // --- In-memory comment store (plays the role of the consumer's useComments) ---
   const [commentsData, setCommentsData] = useState<

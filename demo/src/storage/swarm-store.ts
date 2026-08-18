@@ -93,6 +93,17 @@ const writeHash = (fragment: string) => {
  * other back made every reloaded document look shared, and a document
  * that looks shared is treated as read-only.
  */
+/**
+ * The owner key a sheet was OPENED with, remembered per sheet. The address
+ * bar is not a reliable carrier: Freedom's cold-start "Content not ready
+ * yet" page re-navigates without the URL fragment (field test, 2026-08-18),
+ * and a sheet whose keys arrived by link then silently degraded into a
+ * provider-owned empty one. A revisit reconstructs the keys from here and
+ * writes them back into the URL.
+ */
+export const sheetOwnerKeyStorageKey = (docId: string) =>
+  `dsheet-swarm-owner-key-${docId}`;
+
 const resolveKeys = (
   docId: string,
   generateOwner: () => string,
@@ -109,14 +120,25 @@ const resolveKeys = (
     generateDoc();
   localStorage.setItem(docStorageKey, doc);
 
-  if (providerOwnsFeed && !fromHash?.owner) {
+  const rememberedOwner = localStorage.getItem(sheetOwnerKeyStorageKey(docId));
+
+  if (providerOwnsFeed && !fromHash?.owner && !rememberedOwner) {
     writeHash(`dkey=${encodeURIComponent(doc)}`);
     return { doc };
   }
 
   const owner =
-    fromHash?.owner ?? localStorage.getItem(ownerStorageKey) ?? generateOwner();
-  localStorage.setItem(ownerStorageKey, owner);
+    fromHash?.owner ??
+    rememberedOwner ??
+    localStorage.getItem(ownerStorageKey) ??
+    generateOwner();
+  // Per-sheet first — a link's key belongs to that sheet alone. The global
+  // key stays what it was: this browser's own signing identity for sheets
+  // it creates, never overwritten by someone else's link.
+  localStorage.setItem(sheetOwnerKeyStorageKey(docId), owner);
+  if (!fromHash?.owner && !rememberedOwner) {
+    localStorage.setItem(ownerStorageKey, owner);
+  }
   writeHash(`skey=${encodeURIComponent(owner)}:${encodeURIComponent(doc)}`);
   return { owner, doc };
 };
@@ -270,7 +292,13 @@ export const useSwarmStorage = (docId: string) => {
 
   // Read once, at mount, before resolveKeys writes anything: afterwards the
   // address bar carries a key either way, and the two are indistinguishable.
-  const [documentHasOwnKey] = useState(() => Boolean(readHashKeys()?.owner));
+  // A key remembered from an earlier visit counts too — the fragment may
+  // have been dropped on the way here (Freedom's cold-start error page).
+  const [documentHasOwnKey] = useState(
+    () =>
+      Boolean(readHashKeys()?.owner) ||
+      Boolean(localStorage.getItem(sheetOwnerKeyStorageKey(docId))),
+  );
 
   const docStorage: SwarmDocumentStorage | null = useMemo(() => {
     if (!storageConfig) return null;
