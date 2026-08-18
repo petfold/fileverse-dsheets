@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>bzz:// storage APIs test</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 44rem; padding: 0 1rem; }
+    td { padding: 2px 10px; }
+    .ok { color: #0a7f2e; } .bad { color: #c62828; }
+    pre { background: #f4f4f4; padding: 1rem; font-size: 13px; overflow-x: auto; }
+    @media (prefers-color-scheme: dark) { body { background:#111; color:#ddd } pre { background:#222 } }
+  </style>
+</head>
+<body>
+  <h1>Storage APIs under this origin</h1>
+  <p>
+    Tests the browser storage a dapp needs, on whatever origin this page is
+    served from (<code id="origin"></code>). dSheets requires IndexedDB for
+    its local Yjs persistence — an editor whose IndexedDB never reports
+    ready shows an empty grid with no error.
+  </p>
+  <table id="results"></table>
+  <pre id="detail"></pre>
+  <script>
+    (function () {
+      document.getElementById('origin').textContent =
+        location.origin + ' (' + location.protocol + ')';
+      var rows = [];
+      var detail = [];
+      var render = function () {
+        document.getElementById('results').innerHTML = rows.map(function (r) {
+          return '<tr><td>' + r[0] + '</td><td class="' +
+            (r[1] ? 'ok' : 'bad') + '">' + (r[1] ? 'OK' : 'FAIL') +
+            '</td><td>' + (r[2] || '') + '</td></tr>';
+        }).join('');
+        document.getElementById('detail').textContent = detail.join('\n');
+      };
+      var report = function (name, ok, note, err) {
+        rows.push([name, ok, note || '']);
+        if (err) detail.push(name + ': ' + (err && err.message || err));
+        console.log('[storage-repro]', name, ok ? 'OK' : 'FAIL', err || '');
+        render();
+      };
+
+      try {
+        localStorage.setItem('t', '1');
+        report('localStorage', localStorage.getItem('t') === '1');
+      } catch (e) { report('localStorage', false, '', e); }
+
+      try {
+        sessionStorage.setItem('t', '1');
+        report('sessionStorage', sessionStorage.getItem('t') === '1');
+      } catch (e) { report('sessionStorage', false, '', e); }
+
+      report('indexedDB present', typeof indexedDB !== 'undefined');
+
+      // The real test: full open → write → read round trip, the way
+      // y-indexeddb uses it. "present but never fires onsuccess" is a
+      // known failure mode on unregistered custom schemes — hence the
+      // timeout verdict rather than waiting forever.
+      var settled = false;
+      var done = function (ok, note, err) {
+        if (settled) return; settled = true;
+        report('indexedDB round-trip', ok, note, err);
+      };
+      setTimeout(function () {
+        done(false, 'timed out after 5s (open never completed)');
+      }, 5000);
+      try {
+        var req = indexedDB.open('storage-repro', 1);
+        req.onupgradeneeded = function () {
+          req.result.createObjectStore('kv');
+        };
+        req.onerror = function () { done(false, '', req.error); };
+        req.onblocked = function () { done(false, 'blocked'); };
+        req.onsuccess = function () {
+          try {
+            var db = req.result;
+            var tx = db.transaction('kv', 'readwrite');
+            tx.objectStore('kv').put('value', 'key');
+            tx.oncomplete = function () {
+              var tx2 = db.transaction('kv', 'readonly');
+              var get = tx2.objectStore('kv').get('key');
+              get.onsuccess = function () {
+                done(get.result === 'value',
+                  get.result === 'value' ? 'write+read verified' : 'read mismatch');
+                db.close();
+              };
+              get.onerror = function () { done(false, '', get.error); };
+            };
+            tx.onerror = function () { done(false, '', tx.error); };
+          } catch (e) { done(false, '', e); }
+        };
+      } catch (e) { done(false, '', e); }
+    })();
+  </script>
+</body>
+</html>
