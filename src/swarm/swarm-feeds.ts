@@ -29,6 +29,14 @@ export interface SwarmFeedConfig extends SwarmRequestConfig {
    * need no stamp, so a node without one can still follow feeds.
    */
   postageBatchId?: string;
+  /**
+   * `false` makes writes synchronous: the call returns only once the chunk
+   * has been pushed to the network. Bee's default (deferred) stores locally
+   * and syncs in the background — fine for private data, wrong for content
+   * another node must find promptly: a viewer's node fetching from the
+   * network cannot see a feed update that still sits on the writer's node.
+   */
+  deferredUpload?: boolean;
 }
 
 const SEGMENT_SIZE = 32;
@@ -126,6 +134,9 @@ export const writeFeedUpdate = async (
         'content-type': 'application/octet-stream',
         ...(config.postageBatchId
           ? { 'swarm-postage-batch-id': config.postageBatchId }
+          : {}),
+        ...(config.deferredUpload === false
+          ? { 'swarm-deferred-upload': 'false' }
           : {}),
       },
       body: concatBytes(spanBytes(payload.length), payload),

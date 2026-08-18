@@ -258,7 +258,13 @@ export const useSwarmStorage = (docId: string) => {
         : null;
     }
     return beeUrl && nodeUsable
-      ? { beeUrl, postageBatchId: batchId, onProgress }
+      ? // Synchronous uploads: a snapshot (and its feed pointer) must reach
+        // the network before the save counts, or a viewer's own node — a
+        // Swarm-aware browser reads through one — cannot find the sheet
+        // that this node happily serves locally. Found in the field: the
+        // sample sheet opened in Brave (same node) and blank in Freedom
+        // (own node) because its chunks had never been pushed.
+        { beeUrl, postageBatchId: batchId, onProgress, deferredUpload: false }
       : null;
   }, [nodeUsable, batchId, onProgress, providerTransport]);
 
