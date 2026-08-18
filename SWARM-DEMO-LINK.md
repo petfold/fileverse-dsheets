@@ -58,8 +58,22 @@ Local dev server alternative (from `demo/`, with `VITE_BEE_API_URL` in
 
 ## URL shapes to try
 
-The app writes both parts of a sheet's identity into the address bar as you
-use it, so "the URL you are looking at" is always the link to that sheet:
+A complete sheet URL looks like this (same anatomy as ddoc's sample link —
+`?doc=` there, `?sheet=` here):
+
+```
+http://localhost:1633/bzz/64c0d7cb…9237/?sheet=<sheet-id>#skey=<owner-key>:<doc-key>
+```
+
+You never type those parts: the app generates the sheet id and both keys on
+first open and writes them into the address bar itself (ddoc's `resolveKeys`
+mechanism, ported unchanged). They are only in the *plain* links above
+because no sheet has been published as a sample yet — opening a plain link
+mints (or reopens) a sheet and fills the rest in. The address bar is
+therefore always the complete link to the sheet you are looking at; the
+Share button copies it. In a provider browser the fragment is `#dkey=<doc-key>`
+instead: the feed belongs to the browser's own identity, so no owner key
+travels in the link.
 
 | URL | What it exercises |
 | --- | --- |
