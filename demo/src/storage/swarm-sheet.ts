@@ -38,11 +38,20 @@ export const useSwarmSheet = ({
   documentId,
   docStorage,
   canWrite,
+  expectContent = false,
   onReadOnlySave,
 }: {
   documentId: string;
   docStorage: SwarmDocumentStorage | null;
   canWrite: boolean;
+  /**
+   * True for a sheet that arrived by link: it exists on Swarm by
+   * definition, so a "feed not found" is a retrieval failure to retry and
+   * explain — NOT an empty new sheet. Rendering a blank grid for it reads
+   * as data loss (Freedom field test, 2026-08-18: a cold ultra-light node
+   * answered not-found for chunks the network provably held).
+   */
+  expectContent?: boolean;
   /** A save was refused because another identity owns the feed. */
   onReadOnlySave: () => void;
 }) => {
@@ -72,6 +81,14 @@ export const useSwarmSheet = ({
         try {
           const snapshot = await docStorage.loadDocument(documentId);
           if (cancelled) return;
+          if (!snapshot && expectContent) {
+            throw new Error(
+              'This sheet exists on Swarm (its keys came with the link), ' +
+                'but its feed could not be found from here yet. A node ' +
+                'that has just started may need a minute to reach the ' +
+                'chunks — retrying usually fixes it.',
+            );
+          }
           setRestore({ phase: 'done', snapshot: snapshot?.text ?? null });
           setLastError(null);
           return;

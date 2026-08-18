@@ -86,6 +86,9 @@ function App() {
     documentId: dsheetId,
     docStorage: restoreDeferred ? null : swarm.docStorage,
     canWrite: swarm.canWrite,
+    // A sheet whose keys came in the URL exists on Swarm by definition —
+    // an empty lookup for it is a retrieval failure, not a new sheet.
+    expectContent: swarm.documentHasOwnKey,
     onReadOnlySave,
   });
   const { queueSave } = swarmSheet;
