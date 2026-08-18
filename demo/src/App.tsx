@@ -39,10 +39,22 @@ function App() {
   const { theme } = useTheme();
 
   // --- Sheet identity ---
+  // A URL that names no sheet reopens the browser's last one rather than
+  // starting blank: opening "the app" and finding an empty grid where your
+  // sheet was reads as data loss, though the sheet still lives under its
+  // own ?sheet= URL. A genuinely new sheet is one URL edit away (drop the
+  // ?sheet= parameter in a private window, or pass ?sheet=<new-id>).
   const [dsheetId] = useState<string>(() => {
     const urlSheetId = getSheetIdFromURL();
-    if (urlSheetId) return urlSheetId;
-    const id = `dsheet-${crypto.randomUUID()}`;
+    if (urlSheetId) {
+      localStorage.setItem('dsheet-last-sheet-id', urlSheetId);
+      setURLParams({ sheet: urlSheetId });
+      return urlSheetId;
+    }
+    const id =
+      localStorage.getItem('dsheet-last-sheet-id') ??
+      `dsheet-${crypto.randomUUID()}`;
+    localStorage.setItem('dsheet-last-sheet-id', id);
     setURLParams({ sheet: id });
     return id;
   });
