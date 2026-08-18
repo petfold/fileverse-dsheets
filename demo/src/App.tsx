@@ -21,6 +21,12 @@ import {
 import { useMediaQuery } from 'usehooks-ts';
 import { crypto as cryptoUtils } from './crypto';
 import { collabStore } from './storage/collab-store';
+import { swarmEnabled, useSwarmStorage } from './storage/swarm-store';
+import { useSwarmSheet } from './storage/swarm-sheet';
+import { SwarmNotice } from './components/SwarmNotice';
+import { SwarmRestoreProgress } from './components/SwarmRestoreProgress';
+import { primarySwarmCondition } from '../../src/swarm/swarm-diagnostics';
+import type { DSheetContentSnapshot } from '../../src/persistence';
 import {
   getKeyFromURLParams,
   getSheetIdFromURL,
@@ -45,15 +51,76 @@ function App() {
   const [title, setTitle] = useState('Untitled');
   const isSavedRef = useRef(false);
 
+  // --- Swarm persistence (opt-in via VITE_BEE_API_URL or a browser provider) ---
+  const swarm = useSwarmStorage(dsheetId);
+  // Set once a save is refused because another identity owns the feed —
+  // the document came from someone else's link and is read-only here.
+  const [sharedReadOnly, setSharedReadOnly] = useState(false);
+  const { markDocumentReadOnly } = swarm;
+  const onReadOnlySave = useCallback(() => {
+    markDocumentReadOnly();
+    setSharedReadOnly(true);
+  }, [markDocumentReadOnly]);
+  const swarmSheet = useSwarmSheet({
+    documentId: dsheetId,
+    docStorage: swarm.docStorage,
+    canWrite: swarm.canWrite,
+    onReadOnlySave,
+  });
+  const { queueSave } = swarmSheet;
+
   const handleSheetChange = useCallback(
     (_updateData: unknown, encodedUpdate?: string) => {
       if (encodedUpdate) {
         localStorage.setItem(`dsheet-content-${dsheetId}`, encodedUpdate);
         isSavedRef.current = true;
+        if (swarmEnabled) queueSave(encodedUpdate);
       }
     },
-    [dsheetId],
+    [dsheetId, queueSave],
   );
+
+  // --- Swarm restore: merge the loaded snapshot into the live Y.Doc once
+  // both the snapshot and the editor (local IndexedDB sync) are ready. A
+  // merge is a CRDT union, so local edits made meanwhile survive it. ---
+  const editorStateRef = useRef<{
+    refreshIndexedDB: () => Promise<void>;
+    getContentSnapshot: () => DSheetContentSnapshot;
+    mergeContent: (encodedState: string) => DSheetContentSnapshot;
+  } | null>(null);
+  const [contentSynced, setContentSynced] = useState(false);
+  const onContentSyncStatusChange = useCallback(
+    (status: 'initializing' | 'syncing' | 'synced' | 'error') =>
+      setContentSynced(status === 'synced'),
+    [],
+  );
+  const swarmMergedRef = useRef(false);
+  useEffect(() => {
+    if (swarmMergedRef.current || !contentSynced || !editorStateRef.current)
+      return;
+    if (swarmSheet.restore.phase !== 'done' || !swarmSheet.restore.snapshot)
+      return;
+    editorStateRef.current.mergeContent(swarmSheet.restore.snapshot);
+    swarmMergedRef.current = true;
+  }, [swarmSheet.restore, contentSynced]);
+
+  // Boot overlay while a Swarm-backed sheet is being restored. Loading in
+  // this state (rather than behind the sheet) prevents editing a stale
+  // sheet that the restore is about to catch up.
+  const swarmBooting =
+    swarmEnabled &&
+    !swarmMergedRef.current &&
+    (swarm.nodeState.kind === 'connecting' ||
+      swarmSheet.restore.phase === 'loading' ||
+      swarmSheet.restore.phase === 'failed');
+
+  const swarmCondition = swarmEnabled
+    ? primarySwarmCondition({
+        ...swarm.diagnosticsInput,
+        lastError: swarmSheet.lastError,
+        documentReadOnly: sharedReadOnly,
+      })
+    : null;
 
   // --- In-memory comment store (plays the role of the consumer's useComments) ---
   const [commentsData, setCommentsData] = useState<
@@ -304,7 +371,15 @@ function App() {
             icon="BadgeCheck"
             className="h-6 rounded !border !color-border-default color-text-secondary text-[12px] font-normal hidden xl:flex"
           >
-            Saved locally
+            {!swarmEnabled
+              ? 'Saved locally'
+              : {
+                  idle: 'Saved locally',
+                  saving: 'Saving to Swarm…',
+                  saved: 'Saved to Swarm',
+                  held: 'Edits held for Swarm',
+                  error: 'Swarm save failed',
+                }[swarmSheet.saveState]}
           </Tag>
 
           {collabEnabled && (
@@ -400,7 +475,28 @@ function App() {
             />
           )}
 
-          <Button toggleLeftIcon={true} leftIcon="Share2" variant={'ghost'} className="!min-w-[90px] !px-0 hidden xl:flex">
+          <Button
+            toggleLeftIcon={true}
+            leftIcon="Share2"
+            variant={'ghost'}
+            className="!min-w-[90px] !px-0 hidden xl:flex"
+            onClick={async () => {
+              if (!swarmEnabled) return;
+              // The URL fragment already carries the feed + decryption keys
+              // (see resolveKeys in swarm-store), so the address bar IS the
+              // share link: whoever opens it can read this sheet from Swarm.
+              await navigator.clipboard
+                .writeText(window.location.href)
+                .catch(() => {});
+              toast({
+                title: 'Swarm link copied',
+                description: 'Anyone with this link can read the sheet',
+                variant: 'success',
+                toastType: 'mini',
+                iconType: 'icon',
+              });
+            }}
+          >
             Share
           </Button>
           <div className="flex gap-2 px-2 justify-center items-center">
@@ -413,7 +509,7 @@ function App() {
         </div>
       </>
     );
-  }, [title, collabEnabled, collabStatus, collabIsOwner, collaborationId, collabRoomKey, username, isMediaMax1280px, isOwnerEdSecretSet]);
+  }, [title, collabEnabled, collabStatus, collabIsOwner, collaborationId, collabRoomKey, username, isMediaMax1280px, isOwnerEdSecretSet, swarmSheet.saveState]);
 
   const [isNewSheet, setIsNewSheet] = useState(false);
 
@@ -439,7 +535,39 @@ function App() {
           element={
             <div>
               <Toaster position="bottom-right" duration={3000} />
+              {swarmBooting && (
+                <SwarmRestoreProgress
+                  nodeState={swarm.nodeState}
+                  progress={swarm.progress}
+                  managesPostage={swarm.managesPostage}
+                  attempt={
+                    swarmSheet.restore.phase === 'loading'
+                      ? swarmSheet.restore.attempt
+                      : undefined
+                  }
+                  maxAttempts={3}
+                  error={
+                    swarmSheet.restore.phase === 'failed'
+                      ? swarmSheet.restore.error
+                      : null
+                  }
+                  onSkip={swarmSheet.skipRestore}
+                  onRetry={swarmSheet.retryRestore}
+                />
+              )}
+              {swarmCondition && !swarmBooting && (
+                <SwarmNotice
+                  condition={swarmCondition}
+                  beeUrl={swarm.beeUrl ?? ''}
+                  batchId={swarm.batchId}
+                  onRetry={swarm.recheck}
+                  onBatchReady={swarm.adoptBatch}
+                  onGrantAccess={swarm.grantAccess}
+                />
+              )}
               <DSheetEditor
+                editorStateRef={editorStateRef}
+                onContentSyncStatusChange={onContentSyncStatusChange}
                 isReadOnly={false}
                 theme={theme}
                 renderNavbar={renderNavbar}
