@@ -96,13 +96,28 @@ function App() {
   // the loading screen back over their sheet — it merges silently instead.
   const [hasEdited, setHasEdited] = useState(false);
 
+  // Guards a link-opened sheet's feed against its own reader: the editor
+  // fires onChange the moment it mounts, and saving before the restore has
+  // merged would append a version MISSING the remote content (a snapshot
+  // holds only what the local doc has). Saves for such a sheet wait until
+  // the merge happened — or the feed proved genuinely empty. Kept in a ref
+  // so handleSheetChange's identity stays stable.
+  const swarmMergedRef = useRef(false);
+  const swarmSafeToSaveRef = useRef(false);
+  swarmSafeToSaveRef.current =
+    !swarmEnabled ||
+    !swarm.documentHasOwnKey ||
+    (swarmSheet.restore.phase === 'done' &&
+      (swarmSheet.restore.snapshot === null || swarmMergedRef.current));
+
   const handleSheetChange = useCallback(
     (_updateData: unknown, encodedUpdate?: string) => {
       if (encodedUpdate) {
         localStorage.setItem(`dsheet-content-${dsheetId}`, encodedUpdate);
         isSavedRef.current = true;
         setHasEdited(true);
-        if (swarmEnabled) queueSave(encodedUpdate);
+        if (swarmEnabled && swarmSafeToSaveRef.current)
+          queueSave(encodedUpdate);
       }
     },
     [dsheetId, queueSave],
@@ -122,7 +137,6 @@ function App() {
       setContentSynced(status === 'synced'),
     [],
   );
-  const swarmMergedRef = useRef(false);
   useEffect(() => {
     if (swarmMergedRef.current || !contentSynced || !editorStateRef.current)
       return;
@@ -565,6 +579,12 @@ function App() {
     const timer = setTimeout(() => setIsNewSheet(true), 5000);
     return () => clearTimeout(timer);
   }, []);
+  // A link-opened sheet is never "new": letting the editor seed a default
+  // empty sheet while a slow restore is still running would CRDT-merge a
+  // second Sheet1 into the real content (and, before the save guard, save
+  // that over the feed).
+  const isNewSheetSafe =
+    isNewSheet && (!swarmEnabled || !swarm.documentHasOwnKey);
 
   // @ts-expect-error demo proxy
   window.NEXT_PUBLIC_PROXY_BASE_URL = 'https://staging-api-proxy-ca4268d7d581.herokuapp.com';
@@ -648,7 +668,7 @@ function App() {
                 sheetEditorRef={sheetEditorRef}
                 enableIndexeddbSync={true}
                 isAuthorized={false}
-                isNewSheet={isNewSheet}
+                isNewSheet={isNewSheetSafe}
                 collaboration={collaboration}
                 commentsConfig={{
                   commentsData,
