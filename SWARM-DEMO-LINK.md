@@ -1,21 +1,26 @@
 # dSheets × Swarm — demo links
 
-**Latest demo: `64c0d7cb…`** — the last-sheet-reopen build, 2026-08-18, from `feat/swarm-storage` (PR 2, stacked on PR 1
+**Latest demo: `a228d34d…`** — the synchronous-saves build, 2026-08-18, from `feat/swarm-storage` (PR 2, stacked on PR 1
 `feat/storage-agnostic-collab-services`): pure-Swarm serverless persistence
 — sheet snapshots AES-256-GCM encrypted on Swarm, a feed per sheet as the
 mutable "latest" pointer, feed history as version history. Carries the three
 fixes from the first Freedom field test (ddoc boot screen ported into
 `index.html`; restore deferred under an unconsented provider instead of
 erroring with "Origin not authorized"; restore screen shown instead of the
-editor, not beside it) plus the finding from the second: opening the bare
-app URL now reopens the browser's last sheet instead of minting a fresh
-blank one — what looked like data loss in Brave was a new sheet id, the
-old sheet intact under its own `?sheet=` URL.
+editor, not beside it) plus the findings from the second and third:
+opening the bare app URL reopens the browser's last sheet instead of
+minting a fresh blank one, and saves are now pushed to the network before
+they count (`swarm-deferred-upload: false` on snapshots AND feed updates) —
+the sample sheet had opened blank in Freedom because its chunks, uploaded
+deferred, had never left the writer's node, which is also the only node
+Brave was reading.
 
 Verification state: **package path verified against a live Bee 2.8.1 node;
-UI verified in Brave; Freedom verified deferring correctly on `382e9f55…`
-(editor open, grant offered non-blocking); grant-and-flush and this build's
-last-sheet reopen still to confirm in the field.** All 73 Swarm
+UI verified in Brave (sample sheet renders); Freedom verified deferring
+correctly and reporting browse-only mode; the sample opening with content
+in Freedom is what this build must prove — its chunks are now confirmed
+network-retrievable (`/stewardship` on snapshot and a synchronous re-push
+of the feed chunk).** All 73 Swarm
 unit tests pass live (encrypted save/load/version round-trips, wrong-key
 rejection, stamps endpoints); a headless end-to-end drove the demo's exact
 persistence path (two saves onto a feed, a fresh reader restoring from the
@@ -33,18 +38,19 @@ Served entirely from Swarm — app code and, once you edit, sheet snapshots
 and version history all come off the network:
 
 ```
-http://localhost:1633/bzz/64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237/
+http://localhost:1633/bzz/a228d34dfbb6533e961a50d4e3830dbd80d9e400fed7dfabb3605b4746ddef4d/
 ```
 
 For a Swarm-aware browser (Freedom), the same reference as a `bzz://` URL:
 
 ```
-bzz://64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237/
+bzz://a228d34dfbb6533e961a50d4e3830dbd80d9e400fed7dfabb3605b4746ddef4d/
 ```
 
 Previous builds — still deployed, still read the same sheet feeds:
 
 ```
+64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237   last-sheet-reopen build; saves stayed on the local node (deferred)
 382e9f553956d67d74b39c02f50fa1123393813615c1d7f8dad0171b46b24bda   boot-retry build; bare URL minted a new blank sheet
 95f42ca58ec6bba4641c9248b7fccc7f84a21f34bd1e0d45db73a70bcceb8ad3   first upload, no boot retry / provider defer
 ```
@@ -63,13 +69,13 @@ you edit it — AES-256-GCM encrypted on Swarm, published 2026-08-18. The
 dsheets counterpart of ddoc's `sample-mswwageg`:
 
 ```
-http://localhost:1633/bzz/64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237/?sheet=dsheet-sample-swarm#skey=0xf31588db3bdea51731755f73f06d5c9f20538d2e86a164c60fb4bb32fc2ca15a:%2B5P%2BQ%2Bti%2BvR%2B1SFY5j6jxt9zcgQfLar4Faaj4fPSA7M%3D
+http://localhost:1633/bzz/a228d34dfbb6533e961a50d4e3830dbd80d9e400fed7dfabb3605b4746ddef4d/?sheet=dsheet-sample-swarm#skey=0xf31588db3bdea51731755f73f06d5c9f20538d2e86a164c60fb4bb32fc2ca15a:%2B5P%2BQ%2Bti%2BvR%2B1SFY5j6jxt9zcgQfLar4Faaj4fPSA7M%3D
 ```
 
 For a Swarm-aware browser (Freedom), the same sheet as a `bzz://` URL:
 
 ```
-bzz://64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237/?sheet=dsheet-sample-swarm#skey=0xf31588db3bdea51731755f73f06d5c9f20538d2e86a164c60fb4bb32fc2ca15a:%2B5P%2BQ%2Bti%2BvR%2B1SFY5j6jxt9zcgQfLar4Faaj4fPSA7M%3D
+bzz://a228d34dfbb6533e961a50d4e3830dbd80d9e400fed7dfabb3605b4746ddef4d/?sheet=dsheet-sample-swarm#skey=0xf31588db3bdea51731755f73f06d5c9f20538d2e86a164c60fb4bb32fc2ca15a:%2B5P%2BQ%2Bti%2BvR%2B1SFY5j6jxt9zcgQfLar4Faaj4fPSA7M%3D
 ```
 
 **The link carries write access** over the node API — the fragment holds the
@@ -87,8 +93,9 @@ only as itself).
 Authored headlessly with the editor's own Y.Doc schema (`plainSheetToYMap`
 field set, fortune-sheet celldata), round-tripped through the package's
 `ySheetArrayToPlain` before publishing, then read back decrypted from the
-feed. Not yet opened in a real browser — that render check is part of the
-next field test.
+feed. **Renders correctly in Brave** (2026-08-18). The first Freedom open
+was blank — the deferred-upload propagation bug above, since fixed and the
+chunks re-pushed — so Freedom is the remaining render check.
 
 ## URL shapes to try
 
@@ -96,7 +103,7 @@ A complete sheet URL looks like this (same anatomy as ddoc's sample link —
 `?doc=` there, `?sheet=` here):
 
 ```
-http://localhost:1633/bzz/64c0d7cb…9237/?sheet=<sheet-id>#skey=<owner-key>:<doc-key>
+http://localhost:1633/bzz/a228d34d…ef4d/?sheet=<sheet-id>#skey=<owner-key>:<doc-key>
 ```
 
 You never type those parts: the app generates the sheet id and both keys on
@@ -111,8 +118,8 @@ travels in the link.
 
 | URL | What it exercises |
 | --- | --- |
-| `…/bzz/64c0d7cb…/` | Last sheet reopens (or a fresh one on first visit) |
-| `…/bzz/64c0d7cb…/` in a private window | Fresh sheet: new id in `?sheet=`, new keys in `#skey=` |
+| `…/bzz/a228d34d…/` | Last sheet reopens (or a fresh one on first visit) |
+| `…/bzz/a228d34d…/` in a private window | Fresh sheet: new id in `?sheet=`, new keys in `#skey=` |
 | Same URL again (same browser) | Restore: boot overlay, then the sheet back from Swarm merged with IndexedDB |
 | Same URL in a private window | Shared read: restores from the feed with no local state at all |
 | Same URL, Bee node stopped | Diagnostics bar (node down), edits held; restart the node and they flush |
@@ -132,7 +139,8 @@ fileverse-ddoc's SWARM-DEMO-LINK.md). dsheets additions:
 
 | Content | Reference |
 | --- | --- |
-| Demo site, last-sheet-reopen build (2026-08-18) | `64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237` |
+| Demo site, synchronous-saves build (2026-08-18) | `a228d34dfbb6533e961a50d4e3830dbd80d9e400fed7dfabb3605b4746ddef4d` |
+| Demo site, last-sheet-reopen build (2026-08-18) | `64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237` — superseded: saves (snapshots + feed updates) uploaded deferred, so a viewer on another node — a Swarm-aware browser included — found nothing |
 | Demo site, boot-retry build (2026-08-18) | `382e9f553956d67d74b39c02f50fa1123393813615c1d7f8dad0171b46b24bda` — superseded: opening the bare app URL minted a fresh blank sheet, read as data loss |
 | Demo site, first upload (2026-08-18) | `95f42ca58ec6bba4641c9248b7fccc7f84a21f34bd1e0d45db73a70bcceb8ad3` — superseded: white screen on a cold Freedom load (no boot retry), provider restore errored instead of deferring, restore panel rendered beside a live editor |
 | Sample sheet v0 (2026-08-18) | `c8ccc39d3500b1a2523080e5d61da15a8d8a350bb6bbb8e2340bf276949438a6` + its feed chunk |
