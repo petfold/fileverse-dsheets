@@ -32,12 +32,20 @@ was inspected end to end: all 6 versions intact — versioning works. Two
 Freedom-side issues to file: fragment delivery must be reliable, and a
 fresh node's "not found" is indistinguishable from truly absent content.
 
-Verification state: **package path verified against a live Bee 2.8.1 node;
-UI verified in Brave (sample sheet renders); Freedom's provider read path
-verified down to its node: fragment delivered, reads issued, chunks
-servable warm (confirmed via ant's own API at :22023). Open: the sample
-rendering in Freedom, expected to pass on a warm node or within the new
-minutes-long retry budget on a cold one.** All 73 Swarm
+Verification state: **verified end to end in both browsers, 2026-08-18.**
+Brave renders the sample over the node API. Freedom was driven headlessly
+over the DevTools protocol against the real provider path (inside the
+webview, `window.swarm` injected, read-only, no grant prompt): the SOC
+reads failed while the embedded ant node warmed up, the retry budget
+outwaited it, and at t+40s the restore merged and the sample rendered.
+The fragment-drop hypothesis was falsified by the minimal repro (green
+everywhere); the one Freedom-side issue that remains real is ant answering
+"Single Owner Chunk not found" during warm-up for content it serves fine
+once warm — indistinguishable from truly absent content, so clients must
+guess how long to disbelieve it. Separately, a non-fatal dsheets package
+error surfaced in both runs and deserves its own look:
+`ySheetArrayToPlain after ydoc observe failed TypeError: Cannot assign to
+read only property 'ps'`.** All 73 Swarm
 unit tests pass live (encrypted save/load/version round-trips, wrong-key
 rejection, stamps endpoints); a headless end-to-end drove the demo's exact
 persistence path (two saves onto a feed, a fresh reader restoring from the
