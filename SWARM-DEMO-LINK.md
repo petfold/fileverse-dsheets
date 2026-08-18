@@ -153,6 +153,25 @@ still means one feed key; whoever holds it is "the writer"). In a provider
 browser a link from elsewhere is read-only: the browser signs only as
 itself and cannot advance someone else's feed.
 
+## Freedom fragment-delivery repro
+
+Minimal isolation of the suspected Freedom bug (a page receiving
+`location.hash` empty while the address bar shows the fragment): one
+self-contained page (`demo/fragment-repro.html`) that reports the URL its
+JavaScript actually received and logs every load across the error-page
+bounce. Open it as:
+
+```
+bzz://bdcb78f6a306e7633e98708b6d6b6b8edd139b57cdfa96f205800aa596a8be81/?q=1#test=hello
+```
+
+Green "FRAGMENT RECEIVED" = correct. Red "NO FRAGMENT RECEIVED" with the
+fragment still in the address bar — typically after the cold-start
+"Content not ready yet" page's Try Again — is the bug, isolated from
+dsheets, React and Swarm reads entirely (query params survive; the
+fragment is never sent to any server). This is the repro to attach to the
+Freedom/ant issue.
+
 ## What this postage batch has paid for (dsheets' share)
 
 Batch `c931c8a5ee8def22…` is shared with the ddoc demo (its ledger lives in
@@ -167,6 +186,7 @@ fileverse-ddoc's SWARM-DEMO-LINK.md). dsheets additions:
 | Demo site, last-sheet-reopen build (2026-08-18) | `64c0d7cb256b4ef062e690b5f217847625a3da2c8fa1723ca31f7cfd6df99237` — superseded: saves (snapshots + feed updates) uploaded deferred, so a viewer on another node — a Swarm-aware browser included — found nothing |
 | Demo site, boot-retry build (2026-08-18) | `382e9f553956d67d74b39c02f50fa1123393813615c1d7f8dad0171b46b24bda` — superseded: opening the bare app URL minted a fresh blank sheet, read as data loss |
 | Demo site, first upload (2026-08-18) | `95f42ca58ec6bba4641c9248b7fccc7f84a21f34bd1e0d45db73a70bcceb8ad3` — superseded: white screen on a cold Freedom load (no boot retry), provider restore errored instead of deferring, restore panel rendered beside a live editor |
+| Fragment repro page (2026-08-18) | `bdcb78f6a306e7633e98708b6d6b6b8edd139b57cdfa96f205800aa596a8be81` |
 | Sample sheet v0 (2026-08-18) | `c8ccc39d3500b1a2523080e5d61da15a8d8a350bb6bbb8e2340bf276949438a6` + its feed chunk |
 | Test uploads from the live suites (2026-08-18) | random payloads + e2e sheet feeds, not referenced anywhere |
 
