@@ -10,7 +10,7 @@ In short: offer Swarm to Fileverse upstream in two stages, storage first, then l
 - Move onto 4.1.21. Drop the branch's first commit (`8824069`): its ABI half is upstream as `6e800b8`, and its sync-engine half types hooks upstream no longer has. `src/swarm/` imports nothing from outside itself, so it carries over as it is; remove the two `undefined` hooks from the demo's collaboration config.
 - Rebuild the Swarm demo on upstream's current demo and port the Swarm parts (`storage/swarm-sheet.ts`, `storage/swarm-store.ts` and the Swarm parts of `App.tsx`). The Freedom repro pages (`demo/storage-repro.html`, `demo/fragment-repro.html`), the debug commit and the deployment notes (`SWARM-DEMO-LINK.md`) stay out of the pull request, as does this plan.
 - Sharing through ACT (D-29, point 4): read access per named person by public key, revocable, with history, in place of the per-person key wrapping in Fileverse's own code. To design: how ACT combines with the feed per sheet and its history. Readers need a node key of their own, and Freedom support waits on freedom-browser#648.
-- This module is nearly identical to dDoc's `package/utils/swarm-*`. Whether they become one shared module is our call, made before the pull request opens.
+- One module: since 2026-10-19 this code and dDoc's `package/utils/swarm-*` live as one module, `swarm-dstore` (github.com/petfold/swarm-dstore). Change it there, and the pull request carries a copy.
 
 **Stage 2 here: live editing over Swarm.**
 - A `SwarmSyncManager` behind `useSyncManager`, chosen by a collaboration prop: it opens a `SwarmDoc` session (SwarmRtc transport), and the workbook binding (`editor-workbook-sync`, `use-editor-data` with its remote-apply guard) runs on `swarmDoc.doc` unchanged.
